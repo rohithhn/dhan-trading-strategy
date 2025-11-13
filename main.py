@@ -159,8 +159,7 @@ class DhanTradingStrategy:
     def get_nifty_ltp(self):
         try:
             # NIFTY 50 security ID is 13, exchange is IDX_I (Index)
-            response = self.dhan.get_ltp_data(                securities={"IDX_I": ["13"]}
-                exchange_segment=self.dhan.IDX_I,
+            response = self.dhan.get_ltp_data(exchange_segment=self.dhan.IDX_I, security_id="13")                exchange_segment=self.dhan.IDX_I,
                             security_id="13"
                         )
             if response and 'data' in response:                nifty_data = response['data']['IDX_I'].get('13', {})
