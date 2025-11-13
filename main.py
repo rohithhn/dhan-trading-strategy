@@ -56,16 +56,54 @@ class TelegramNotifier:
             logger.error(f"Error sending Telegram message: {e}")
 
 class GPTAssistant:
-    def __init__(self, api_key):
+    def __init__(self, api_key, strategy_instance=None):
         self.api_key = api_key
         self.base_url = "https://api.openai.com/v1/chat/completions"
         self.conversation_history = []
         
+        
     def chat(self, user_message, detailed=False):
         try:
             # Build context with recent logs
-            context = f"{strategy_context}\n\nRecent logs: {json.dumps(trade_logs[-5:]) if trade_logs else 'No logs yet'}"
+            # Build comprehensive real-time context
+            realtime_data = {}
+            if self.strategy:
+                # Get current market data
+                current_price = self.strategy.get_nifty_ltp()
+                market_open = self.strategy.check_market_hours()
+                
+                # Calculate statistics from logs
+                total_logs = len(trade_logs)
+                recent_logs = trade_logs[-10:] if trade_logs else []
+                
+                realtime_data = {
+                    'current_nifty_price': current_price,
+                    'market_status': 'OPEN' if market_open else 'CLOSED',
+                    'total_log_entries': total_logs,
+                    'recent_logs': recent_logs,
+                    'bot_running': self.strategy.is_running
+                }
             
+            # Enhanced context with real-time data and code awareness
+            context = f"""{strategy_context}
+
+REAL-TIME STATUS:
+- NIFTY Price: {realtime_data.get('current_nifty_price', 'N/A')}
+- Market: {realtime_data.get('market_status', 'Unknown')}
+- Total Entries: {realtime_data.get('total_log_entries', 0)}
+- Bot Status: {'Active' if realtime_data.get('bot_running', False) else 'Inactive'}
+
+RECENT LOGS (Last 10):
+{json.dumps(realtime_data.get('recent_logs', []), indent=2) if realtime_data.get('recent_logs') else 'No recent logs'}
+
+CODE INFO:
+- Strategy: NIFTY 50 scalping with Dhan API
+- Components: DhanTradingStrategy class, TelegramNotifier, GPTAssistant
+- Data Source: Dhan HQ API (real-time market data)
+- Trading Hours: Mon-Fri 9:15 AM - 3:30 PM IST
+- Analysis Interval: Every 5 minutes
+- GitHub: dhan-trading-strategy repository
+"""            
             system_prompt = {
                 "role": "system",
                 "content": f"You are a concise trading assistant. {context}. Keep answers under 50 words unless user asks for detailed explanation. Be direct and precise."
@@ -111,7 +149,7 @@ class DhanTradingStrategy:
         
     def initialize(self):
         try:
-            self.dhan = dhanhq(CLIENT_ID, ACCESS_TOKEN)
+            self.dhan = dhanhq(CLIENT_ID, ACCE, self)S_TOKEN)
             logger.info("Dhan API client initialized successfully")
             self.telegram.send_message("🚀 *Dhan Trading Bot Started*\n\nBot is now monitoring NIFTY 50")
             return True
@@ -122,16 +160,14 @@ class DhanTradingStrategy:
     def get_nifty_ltp(self):
         try:
             # NIFTY 50 security ID is 13, exchange is IDX_I (Index)
-            response = self.dhan.ticker_data(
-                securities={"IDX_I": ["13"]}
-            )
-            
-            if response and 'data' in response and 'IDX_I' in response['data']:
-                nifty_data = response['data']['IDX_I'].get('13', {})
-                ltp = nifty_data.get('LTP', nifty_data.get('last_price', 0))
+            response = self.dhan.get_ltp_data(                securities={"IDX_I": ["13"]}
+                exchange_segment=self.dhan.IDX_I,
+                            security_id="13"
+                        )
+            if response and 'data' in response:                nifty_data = response['data']['IDX_I'].get('13', {})
+                ltp = response['data']['IDX_I']['13']['last_price']                logger.info(f"NIFTY 50 LTP: {ltp}")
                 logger.info(f"NIFTY 50 LTP: {ltp}")
-                return ltp
-            
+                            return ltp
             logger.warning("Could not fetch NIFTY LTP from response")
             return None
         except Exception as e:
