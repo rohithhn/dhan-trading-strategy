@@ -149,8 +149,7 @@ class DhanTradingStrategy:
         
     def initialize(self):
         try:
-            self.dhan = dhanhq(CLIENT_ID, ACCE, self)S_TOKEN)
-            logger.info("Dhan API client initialized successfully")
+            self.dhan = dhanhq(CLIENT_ID, ACCESS_TOKEN)
             self.telegram.send_message("🚀 *Dhan Trading Bot Started*\n\nBot is now monitoring NIFTY 50")
             return True
         except Exception as e:
